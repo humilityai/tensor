@@ -19,13 +19,20 @@ func (p *Tensor) Stream(mutable []bool) (*Stream, error) {
 	finalizeChan := make(chan bool, 1)
 
 	go func(p *Tensor) {
-		select {
-		case data := <-dataChan:
-			p.addData(data)
-		case <-finalizeChan:
-			close(dataChan)
-			close(finalizeChan)
-			break
+		var b bool
+		for {
+			select {
+			case data := <-dataChan:
+				p.addData(data)
+			case <-finalizeChan:
+				close(dataChan)
+				close(finalizeChan)
+				b = true
+			}
+
+			if b {
+				break
+			}
 		}
 	}(p)
 
