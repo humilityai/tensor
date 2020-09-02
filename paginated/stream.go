@@ -4,8 +4,8 @@ package paginated
 // to a paginated tensor.
 type Stream struct {
 	*Tensor
-	data     chan Array
-	finalize chan bool
+	data  chan Array
+	close chan bool
 }
 
 // Stream can be used to more easily write a large amount of data
@@ -16,7 +16,7 @@ func (p *Tensor) Stream(mutable []bool) (*Stream, error) {
 	}
 
 	dataChan := make(chan Array, 1)
-	finalizeChan := make(chan bool, 1)
+	closeChan := make(chan bool, 1)
 
 	go func(p *Tensor) {
 		var b bool
@@ -24,9 +24,9 @@ func (p *Tensor) Stream(mutable []bool) (*Stream, error) {
 			select {
 			case data := <-dataChan:
 				p.addData(data)
-			case <-finalizeChan:
+			case <-closeChan:
 				close(dataChan)
-				close(finalizeChan)
+				close(closeChan)
 				b = true
 			}
 
@@ -37,9 +37,9 @@ func (p *Tensor) Stream(mutable []bool) (*Stream, error) {
 	}(p)
 
 	return &Stream{
-		Tensor:   p,
-		data:     dataChan,
-		finalize: finalizeChan,
+		Tensor: p,
+		data:   dataChan,
+		close:  closeChan,
 	}, nil
 }
 
@@ -49,9 +49,9 @@ func (s *Stream) Send(data Array) {
 	s.data <- data
 }
 
-// Finalize will close all channels, thus killing the Stream
-func (s *Stream) Finalize() {
-	s.finalize <- true
+// Close will close all channels, thus killing the Stream
+func (s *Stream) Close() {
+	s.close <- true
 }
 
 func (p *Tensor) addData(data Array) error {
